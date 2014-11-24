@@ -20,12 +20,19 @@ bool wifiPresent;   //track is wifi card is present
 bool WIFI::begin(void)
 {
 	boolean result = false;
+#if 0	
 	_cell.begin(115200);	//The default baud rate of ESP8266 is 115200
-	
+#else
+	_cell.begin(9600);	//For new firmware
+#endif
 	DebugSerial.begin(debugBaudRate);
 
 	_cell.flush();
+#if 0	
 	_cell.setTimeout(3000);
+#else
+	_cell.setTimeout(10000); // For new firmware
+#endif
 	println(F("AT+RST"));
 	result = _cell.find("ready");
 	if(result)
