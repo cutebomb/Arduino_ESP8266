@@ -1,5 +1,17 @@
 # ESP8266 library #
 
+## CAUTION! ##
+
+You may need to modify the baud rate in file `uartWIFI.cpp`:
+
+	_cell.begin(9600)
+
+to
+
+	_cell.begin(XXX) // XXX is the baud rate fitting ESP8266 firmware
+
+## Select your board ##
+
 When you use with UNO board, uncomment the follow line in uartWIFI.h.
 
 	#define UNO
