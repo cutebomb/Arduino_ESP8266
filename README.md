@@ -20,10 +20,6 @@ When you use with MEGA board, uncomment the follow line in uartWIFI.h.
 
 	#define MEGA
 	
-When you use with LEONARDO board, uncomment the following line in uartWIFI.h:
-
-	#define LEO
-
 When you use with Leonardo board, uncomment the follow line in uartWIFI.h.
 
 	#define LEO
