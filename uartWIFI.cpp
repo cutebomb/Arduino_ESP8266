@@ -1,48 +1,47 @@
 #include "uartWIFI.h"
 
 #ifdef UNO
-SoftwareSerial mySerial(_DBG_RXPIN_,_DBG_TXPIN_);
+
+SoftwareSerial mySerial(_ESP8266_RXPIN_,_ESP8266_TXPIN_);
+
 #endif
 
 #ifdef DEBUG
-#define DBG(message)    DebugSerial.print(message)
-#define DBGLN(message)    DebugSerial.println(message)
+#define DBG(message)    DebugSerial.println(message)
 #define DBGW(message)    DebugSerial.write(message)
 #else
 #define DBG(message)
-#define DBGLN(message)
 #define DBGW(message)
 #endif // DEBUG
 
-int8_t chlID;		//client id(0-4)
-bool wifiPresent;   //track is wifi card is present
+int chlID;		//client id(0-4)
 
-bool WIFI::begin(void)
+void WIFI::begin(void)
 {
-	boolean result = false;
+    char line[128];
+    _cell.begin(ESP8266BaudRate);	//The default baud rate of ESP8266 is 115200
+	
+    DebugSerial.begin(debugBaudRate);		//The default baud rate for debugging is 9600
+    _cell.flush();
+    _cell.setTimeout(10000);
+    _cell.println("AT+GMR");
+    int n = _cell.readBytesUntil('\n',line, 127);
+    n = _cell.readBytesUntil('\n',line, 127);
+    line[n] = '\0';
+    DBG("version is:");
+    DBG(line);
+    while(true) {
+        int n = _cell.readBytesUntil('\n',line, 127);
+        if(strncmp(line, "OK", 2) == 0) {
+            break;
+        }
+        line[n] = '\0';
+    }
+    DBG("Module is ready");
+    return;
 
-	_cell.begin(9600);
-
-	DebugSerial.begin(debugBaudRate);
-
-	_cell.flush();
-
-	_cell.setTimeout(10000);
-
-	println(F("AT+RST"));
-	result = _cell.find("ready");
-	if(result)
-	{
-		DBGLN(F("Module is ready"));
-		wifiPresent = true;
-	}
-    else
-	{
-		DBGLN(F("Module have no response"));
-		wifiPresent = false;
-	}
-	return wifiPresent;
 }
+
 
 /*************************************************************************
 //Initialize port
@@ -67,8 +66,6 @@ bool WIFI::begin(void)
 ***************************************************************************/
 bool WIFI::Initialize(byte mode, String ssid, String pwd, byte chl, byte ecn)
 {
-	if (!wifiPresent) return false;
-
 	if (mode == STA)
 	{	
 		bool b = confMode(mode);
@@ -126,8 +123,6 @@ bool WIFI::Initialize(byte mode, String ssid, String pwd, byte chl, byte ecn)
 ***************************************************************************/
 boolean WIFI::ipConfig(byte type, String addr, int port, boolean a, byte id)
 {
-	if (!wifiPresent) return false;
-
 	boolean result = false;
 	if (a == 0 )
 	{
@@ -174,8 +169,6 @@ boolean WIFI::ipConfig(byte type, String addr, int port, boolean a, byte id)
 ***************************************************************************/
 int WIFI::ReceiveMessage(char *buf)
 {
-	if (!wifiPresent) return 0;
-	
 	//+IPD,<len>:<data>
 	//+IPD,<id>,<len>:<data>
 	String data = "";
@@ -200,7 +193,7 @@ int WIFI::ReceiveMessage(char *buf)
 					break;
 				}
 			}
-			
+			//Serial.println(data);
 			int sLen = strlen(data.c_str());
 			int i,j;
 			for (i = 0; i <= sLen; i++)
@@ -222,8 +215,8 @@ int WIFI::ReceiveMessage(char *buf)
 				
 			}
 			int iSize;
-			DBGLN(data);
-			
+			//DBG(data);
+			//DBG("\r\n");
 			if(found ==true)
 			{
 			String _id = data.substring(4, j);
@@ -240,7 +233,8 @@ int WIFI::ReceiveMessage(char *buf)
 			{			
 			String _size = data.substring(4, i);
 			iSize = _size.toInt();
-			//DBGLN(iSize);
+			//DBG(iSize);
+			//DBG("\r\n");
 			String str = data.substring(i+1, i+1+iSize);
 			strcpy(buf, str.c_str());
 			//DBG(str);
@@ -263,15 +257,13 @@ int WIFI::ReceiveMessage(char *buf)
 ***************************************************************************/
 void WIFI::Reset(void)
 {
- 	if (!wifiPresent) return;
- 	
-   println(F("AT+RST"));
+    _cell.println("AT+RST");
 	unsigned long start;
 	start = millis();
     while (millis()-start<5000) {                            
         if(_cell.find("ready")==true)
         {
-			DBGLN(F("reboot wifi is OK"));
+			DBG("reboot wifi is OK\r\n");
            break;
         }
     }
@@ -297,10 +289,8 @@ void WIFI::Reset(void)
 ***************************************************************************/
 String WIFI::showMode()
 {
-	if (!wifiPresent) return "";
-
     String data;
-    println(F("AT+CWMODE?"));  
+    _cell.println("AT+CWMODE?");  
 	unsigned long start;
 	start = millis();
     while (millis()-start<2000) {
@@ -344,13 +334,10 @@ String WIFI::showMode()
 
 bool WIFI::confMode(byte a)
 {
-	if (!wifiPresent) return false;
-
     String data;
-    print(F("AT+CWMODE="));  
-    println(String(a));
-	
-	unsigned long start;
+     _cell.print("AT+CWMODE=");  
+     _cell.println(String(a));
+	 unsigned long start;
 	start = millis();
     while (millis()-start<2000) {
       if(_cell.available()>0)
@@ -364,12 +351,6 @@ bool WIFI::confMode(byte a)
       }
 	  if (data.indexOf("ERROR")!=-1 || data.indexOf("busy")!=-1)
 	  {
-		  while(_cell.available()>0)
-		  {
-			  char a =_cell.read();
-			  data=data+a;
-		  }
-		  DBGLN(data);
 		  return false;
 	  }
 	  
@@ -388,11 +369,9 @@ bool WIFI::confMode(byte a)
 
 String WIFI::showAP(void)
 {
-	if (!wifiPresent) return "";
-
     String data;
 	_cell.flush();
-    println(F("AT+CWLAP"));  
+    _cell.print("AT+CWLAP\r\n");  
 	delay(1000);
 	while(1);
     unsigned long start;
@@ -436,10 +415,8 @@ String WIFI::showAP(void)
 ***************************************************************************/
 String WIFI::showJAP(void)
 {
-	if (!wifiPresent) return "";
-	
 	_cell.flush();
-    println(F("AT+CWJAP?"));  
+    _cell.println("AT+CWJAP?");  
       String data;
 	  unsigned long start;
 	start = millis();
@@ -477,18 +454,17 @@ String WIFI::showJAP(void)
 ***************************************************************************/
 boolean WIFI::confJAP(String ssid , String pwd)
 {
-	if (!wifiPresent) return false;
 	
-    print(F("AT+CWJAP="));
-    print(F("\""));     //"ssid"
-    print(ssid);
-    print(F("\""));
+    _cell.print("AT+CWJAP=");
+    _cell.print("\"");     //"ssid"
+    _cell.print(ssid);
+    _cell.print("\"");
 
-    print(F(","));
+    _cell.print(",");
 
-    print(F("\""));      //"pwd"
-    print(pwd);
-    println(F("\""));
+    _cell.print("\"");      //"pwd"
+    _cell.print(pwd);
+    _cell.println("\"");
 
 
     unsigned long start;
@@ -514,9 +490,7 @@ boolean WIFI::confJAP(String ssid , String pwd)
 
 boolean WIFI::quitAP(void)
 {
-	if (!wifiPresent) return false;
-
-    println(F("AT+CWQAP"));
+    _cell.println("AT+CWQAP");
     unsigned long start;
 	start = millis();
     while (millis()-start<3000) {                            
@@ -539,9 +513,7 @@ boolean WIFI::quitAP(void)
 ***************************************************************************/
 String WIFI::showSAP()
 {
-	if (!wifiPresent) return "";
-	
-    println(F("AT+CWSAP?"));  
+    _cell.println("AT+CWSAP?");  
       String data;
       unsigned long start;
 	start = millis();
@@ -578,25 +550,22 @@ String WIFI::showSAP()
 
 boolean WIFI::confSAP(String ssid , String pwd , byte chl , byte ecn)
 {
-	if (!wifiPresent) return false;
+    _cell.print("AT+CWSAP=");  
+    _cell.print("\"");     //"ssid"
+    _cell.print(ssid);
+    _cell.print("\"");
 
-    print(F("AT+CWSAP="));  
-    print(F("\""));     //"ssid"
-    print(ssid);
-    print(F("\""));
+    _cell.print(",");
 
-    print(F(","));
+    _cell.print("\"");      //"pwd"
+    _cell.print(pwd);
+    _cell.print("\"");
 
-    print(F("\""));      //"pwd"
-    print(pwd);
-    print(F("\""));
+    _cell.print(",");
+    _cell.print(String(chl));
 
-    print(F(","));
-    print(String(chl));
-
-    print(F(","));
-    println(String(ecn));
-        
+    _cell.print(",");
+    _cell.println(String(ecn));
 	unsigned long start;
 	start = millis();
     while (millis()-start<3000) {                            
@@ -633,10 +602,8 @@ boolean WIFI::confSAP(String ssid , String pwd , byte chl , byte ecn)
 
 String WIFI::showStatus(void)
 {
-	if (!wifiPresent) return "";
-	
-    println(F("AT+CIPSTATUS"));  
-    String data;
+    _cell.println("AT+CIPSTATUS");  
+      String data;
     unsigned long start;
 	start = millis();
     while (millis()-start<3000) {
@@ -671,10 +638,8 @@ String WIFI::showStatus(void)
 ***************************************************************************/
 String WIFI::showMux(void)
 {
-	if (!wifiPresent) return "";
-	
     String data;
-    println(F("AT+CIPMUX?"));  
+    _cell.println("AT+CIPMUX?");  
 
       unsigned long start;
 	start = millis();
@@ -713,11 +678,8 @@ String WIFI::showMux(void)
 ***************************************************************************/
 boolean WIFI::confMux(boolean a)
 {
-	if (!wifiPresent) return false;
-
-	print(F("AT+CIPMUX="));
-	println(String(a));           
-	
+	_cell.print("AT+CIPMUX=");
+	_cell.println(a);           
 	unsigned long start;
 	start = millis();
 	while (millis()-start<3000) {                            
@@ -747,25 +709,25 @@ boolean WIFI::confMux(boolean a)
 
 ***************************************************************************/
 boolean WIFI::newMux(byte type, String addr, int port)
-{
-	if (!wifiPresent) return false;
 
+{
     String data;
-    print(F("AT+CIPSTART="));
+    _cell.print("AT+CIPSTART=");
     if(type>0)
     {
-        print(F("\"TCP\""));
+        _cell.print("\"TCP\"");
     }else
     {
-        print(F("\"UDP\""));
+        _cell.print("\"UDP\"");
     }
-    print(F(","));
-    print(F("\""));
-    print(addr);
-    print(F("\""));
-    print(F(","));
-    println(String(port));
-        
+    _cell.print(",");
+    _cell.print("\"");
+    _cell.print(addr);
+    _cell.print("\"");
+    _cell.print(",");
+//    _cell.print("\"");
+    _cell.println(String(port));
+//    _cell.println("\"");
     unsigned long start;
 	start = millis();
 	while (millis()-start<3000) { 
@@ -798,28 +760,29 @@ boolean WIFI::newMux(byte type, String addr, int port)
 
 ***************************************************************************/
 boolean WIFI::newMux( byte id, byte type, String addr, int port)
-{
-	if (!wifiPresent) return false;
 
-    print(F("AT+CIPSTART="));
-    print(F("\""));
-    print(String(id));
-    print(F("\""));
+{
+
+    _cell.print("AT+CIPSTART=");
+    _cell.print("\"");
+    _cell.print(String(id));
+    _cell.print("\"");
     if(type>0)
     {
-        print(F("\"TCP\""));
+        _cell.print("\"TCP\"");
     }
 	else
     {
-        print(F("\"UDP\""));
+        _cell.print("\"UDP\"");
     }
-    print(F(","));
-    print(F("\""));
-    print(addr);
-    print(F("\""));
-    print(F(","));
-    println(String(port));
-    
+    _cell.print(",");
+    _cell.print("\"");
+    _cell.print(addr);
+    _cell.print("\"");
+    _cell.print(",");
+//    _cell.print("\"");
+    _cell.println(String(port));
+//    _cell.println("\"");
     String data;
     unsigned long start;
 	start = millis();
@@ -850,11 +813,10 @@ boolean WIFI::newMux( byte id, byte type, String addr, int port)
 ***************************************************************************/
 boolean WIFI::Send(String str)
 {
-	if (!wifiPresent) return false;
-
-    print(F("AT+CIPSEND="));
-    println(String(str.length()));
-        
+    _cell.print("AT+CIPSEND=");
+//    _cell.print("\"");
+    _cell.println(str.length());
+//    _cell.println("\"");
     unsigned long start;
 	start = millis();
 	bool found;
@@ -864,11 +826,9 @@ boolean WIFI::Send(String str)
 			found = true;
            break;
         }
-    }
-	if(found)
-	{
-		print(str);
-	}
+     }
+	 if(found)
+		_cell.print(str);
 	else
 	{
 		closeMux();
@@ -906,14 +866,11 @@ boolean WIFI::Send(String str)
 ***************************************************************************/
 boolean WIFI::Send(byte id, String str)
 {
-	if (!wifiPresent) return false;
-	
-    print(F("AT+CIPSEND="));
+    _cell.print("AT+CIPSEND=");
 
-    print(String(id));
-    print(F(","));
-    println(String(str.length()));
-        
+    _cell.print(String(id));
+    _cell.print(",");
+    _cell.println(str.length());
     unsigned long start;
 	start = millis();
 	bool found;
@@ -956,9 +913,7 @@ boolean WIFI::Send(byte id, String str)
 ***************************************************************************/
 void WIFI::closeMux(void)
 {
-	if (!wifiPresent) return;
-
-    println(F("AT+CIPCLOSE"));
+    _cell.println("AT+CIPCLOSE");
 
     String data;
     unsigned long start;
@@ -985,11 +940,8 @@ void WIFI::closeMux(void)
 ***************************************************************************/
 void WIFI::closeMux(byte id)
 {
-	if (!wifiPresent) return;
-
-    print(F("AT+CIPCLOSE="));
-    println(String(id));
-        
+    _cell.print("AT+CIPCLOSE=");
+    _cell.println(String(id));
     String data;
     unsigned long start;
 	start = millis();
@@ -1015,39 +967,23 @@ void WIFI::closeMux(byte id)
 ***************************************************************************/
 String WIFI::showIP(void)
 {
-	if (!wifiPresent) return "";
-	
-    String data;
-    unsigned long start;
-	for(int a=0; a<3;a++)
-	{
-	println(F("AT+CIFSR"));  
-	start = millis();
-	while (millis()-start<3000) {
-     while(_cell.available()>0)
-     {
-     char a =_cell.read();
-     data=data+a;
-     }
-     if (data.indexOf("AT+CIFSR")!=-1)
-     {
-         break;
-     }
-	}
-	if(data.indexOf(".") != -1)
-	{
-		break;
-	}
-	data = "";
-  }
-	//DBGLN(data);
-    char head[4] = {0x0D,0x0A};   
-    char tail[7] = {0x0D,0x0D,0x0A};        
-    data.replace("AT+CIFSR","");
-    data.replace(tail,"");
-    data.replace(head,"");
-  
-    return data;
+    char ip[20];
+    char line[128];
+    //DBG("AT+CIFSR\r\n");
+	_cell.println("AT+CIFSR");
+    int n = _cell.readBytesUntil('\n',line, 127);
+    n = _cell.readBytesUntil('\n',line, 127);
+    line[n] = '\0';
+    while(0 != strncmp(line, "OK", 2)) {
+        //DBG(line);
+        if(isdigit(line[0]) && isdigit(line[1]) && isdigit(line[2])) {
+            strcpy(ip, line);
+            break;
+        }
+        _cell.readBytesUntil('\n',line, 127);
+        line[n] = '\0';
+    }
+    return ip;
 }
 
 /*************************************************************************
@@ -1067,13 +1003,11 @@ String WIFI::showIP(void)
 
 boolean WIFI::confServer(byte mode, int port)
 {
-	if (!wifiPresent) return false;
+    _cell.print("AT+CIPSERVER=");  
+    _cell.print(String(mode));
+    _cell.print(",");
+    _cell.println(String(port));
 
-    print(F("AT+CIPSERVER="));  
-    print(String(mode));
-    print(F(","));
-    println(String(port));
-    
     String data;
     unsigned long start;
 	start = millis();
@@ -1091,76 +1025,4 @@ boolean WIFI::confServer(byte mode, int port)
      }
   }
   return found;
-}
-
-/*************************************************************************
-//// Set the CIPSERVER timeout.
-	timeout:	<timeout>
-		
-	return:
-		true	-	successfully
-		false	-	unsuccessfully
-
-***************************************************************************/
-
-boolean WIFI::setTimeout(int timeout)
-{
-	_cell.print(F("AT+CIPSTO="));
-	_cell.println(String(timeout));
-	
-	String data;
-	unsigned long start;
-	start = millis();
-	boolean found = false;
-	while(millis()-start<3000){
-		if(_cell.available()>0)
-		{
-			data += _cell.read();
-		}
-		if(data.indexOf("OK")!=-1 || data.indexOf("no change")!=-1)
-		{
-			found = true;
-			break;
-		}
-	}
-	return found;
-}
-
-/*********************************************
- *********************************************
- *********************************************
-             Utility Functions
- *********************************************
- *********************************************
- *********************************************
- */
-
-/*************************************************************************
-//print and println
-		
-		param:	text to send either as string or as F("value")
-
-***************************************************************************/
-void WIFI::print(const __FlashStringHelper *ifsh)
-{
-	DBG(ifsh);
-	_cell.print(ifsh);
-}
-
-void WIFI::print(const String &s)
-{
-	DBG(s);
-	_cell.print(s);
-}
-
-void WIFI::println(const __FlashStringHelper *ifsh)
-{
-	DBGLN(ifsh);
-	_cell.println(ifsh);
-}
-
-void WIFI::println(const String &s)
-{
-	DBGLN(s);
-	_cell.println(s);
 }
