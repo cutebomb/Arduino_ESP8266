@@ -3,9 +3,7 @@ testing with Arduino UNO
 
 ## Connection: ##
 Connect the ESP8266's TX and RX to any Arduino I/O pin
-and 
-#define _ESP8266_RXPIN_ pin_num1
-#define _ESP8266_TXPIN_ pin_num2
+and define the _ESP8266_RXPIN_ _ESP8266_TXPIN_ to the SoftSerial's TX and RX pin number
 
 When you want to output the debug information, please use DebugSerial. For example,
 
