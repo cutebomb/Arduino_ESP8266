@@ -1,9 +1,7 @@
 #include "uartWIFI.h"
 
-#ifdef UNO
-
+#ifdef USE_SOFTWARESERIAL
 SoftwareSerial mySerial(_ESP8266_RXPIN_,_ESP8266_TXPIN_);
-
 #endif
 
 #ifdef DEBUG
@@ -21,7 +19,10 @@ void WIFI::begin(void)
     char line[128];
     _cell.begin(ESP8266BaudRate);	//The default baud rate of ESP8266 is 115200
 	
+	#ifdef DEBUG
     DebugSerial.begin(debugBaudRate);		//The default baud rate for debugging is 9600
+    #endif
+    
     _cell.flush();
     _cell.setTimeout(10000);
     _cell.println("AT+GMR");

@@ -32,29 +32,28 @@ V1.0	released the first version of ESP8266 library
 #define debugBaudRate 9600
 
 
-#define UNO			//uncomment this line when you use it with UNO board
-//#define MEGA		//uncomment this line when you use it with MEGA board
-
-
 #define DEBUG
 
 
-#ifdef UNO
+#if (defined __AVR_ATmega328P__) || (defined __AVR_ATmega328__) || (defined __AVR_ATmega32U4__) //@TODO: Add more Chips that behave the same way like in the UNO
+#define ESP_CONFIG_OK
+#define USE_SOFTWARESERIAL
 #define _cell	mySerial
 #define DebugSerial	Serial
-
 #endif  
-#ifdef MEGA
+
+#if (defined __AVR_ATmega2560__) //@TODO: Add more definitions for the Arduino Mega
+#define ESP_CONFIG_OK
 #define _cell	Serial1
 #define DebugSerial	Serial
 #endif  
-		
 
-		
-		
-#ifdef UNO
+#ifndef ESP_CONFIG_OK
+#error Please update the Controller configs above and add the chip your arduino uses to the correct section
+#endif
+
+#ifdef USE_SOFTWARESERIAL
 extern SoftwareSerial mySerial;
-
 #endif
 
 
