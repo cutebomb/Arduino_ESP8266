@@ -1,9 +1,7 @@
 #include "uartWIFI.h"
 
-#ifdef UNO
-
+#ifdef USE_SOFTWARESERIAL
 SoftwareSerial mySerial(_ESP8266_RXPIN_,_ESP8266_TXPIN_);
-
 #endif
 
 #ifdef DEBUG
